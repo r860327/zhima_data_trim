@@ -13,29 +13,33 @@ import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.Timer;
 import com.zhimatech.mofi.datatrim.*;
+import com.zhimatech.mofi.util.Util;
 
 public class DataTrim {
 	private static final String TAG = "zhimaDataTrim";
 	
 	private Timer timer = new Timer();
+	private DataProvider mDp = new DataProvider();
 	
 	class MyTask extends TimerTask{
 		@Override
 		public void run() {
 			// TODO Auto-generated method stub
-			
+//			Util.Log(TAG, "Timetask start");
+//			mDp.init();
+//			mDp.updateRawCustomerFlowTable();
+//			//mDp.dump();
+//			Util.Log(TAG, "Timetask end");
 		}
 	}
-	
-	private int selectFromRawDB() {
-		return 0;
-	}
-	private void insertToDB() {
-		
-	}
-	
+
 	public DataTrim() throws IOException {
 		timer.schedule(new MyTask(), 1000, 5000);
+		Util.Log(TAG, "Timetask start");
+		mDp.init();
+		mDp.updateRawCustomerFlowTable();
+		//mDp.dump();
+		Util.Log(TAG, "Timetask end");
 	}
 	
 	public static void main(String[] args) throws IOException {
@@ -64,10 +68,7 @@ public class DataTrim {
 //			ResultSet resultSet = h.selectSQL(s);
 //			h.layoutStyle2(resultSet);
 //		}
-
-//		new DataTrim();
-		DataProvider dp = new DataProvider();
-		dp.queryDevices();
+		new DataTrim();
 	}
 }
 class DataUtil {
