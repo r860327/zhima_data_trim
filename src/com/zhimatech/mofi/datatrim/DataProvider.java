@@ -281,7 +281,7 @@ public class DataProvider {
 		queryDate();
 		queryDateWithDevices();
 	}
-	
+
 	private void log(String data) {
 		if(DBG) {
 			Util.Log(TAG, data);

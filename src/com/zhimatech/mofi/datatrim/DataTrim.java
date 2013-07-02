@@ -25,21 +25,21 @@ public class DataTrim {
 		@Override
 		public void run() {
 			// TODO Auto-generated method stub
-//			Util.Log(TAG, "Timetask start");
-//			mDp.init();
-//			mDp.updateRawCustomerFlowTable();
-//			//mDp.dump();
-//			Util.Log(TAG, "Timetask end");
+			Util.Log(TAG, "Timetask start");
+			mDp.init();
+			mDp.updateRawCustomerFlowTable();
+			mDp.dump();
+			Util.Log(TAG, "Timetask end");
 		}
 	}
 
 	public DataTrim() throws IOException {
-		timer.schedule(new MyTask(), 1000, 5000);
-		Util.Log(TAG, "Timetask start");
+		timer.schedule(new MyTask(), 1000, 1800000);
+//		Util.Log(TAG, "Timetask start");
 		mDp.init();
-		mDp.updateRawCustomerFlowTable();
+//		mDp.updateRawCustomerFlowTable();
 		//mDp.dump();
-		Util.Log(TAG, "Timetask end");
+//		Util.Log(TAG, "Timetask end");
 	}
 	
 	public static void main(String[] args) throws IOException {
