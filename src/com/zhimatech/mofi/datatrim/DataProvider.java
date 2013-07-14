@@ -27,6 +27,7 @@ public class DataProvider {
 	
 	private static final String STAY_TIME_AVG_DEVICESID_COLUMN = "devicesID";
 	private static final String STAY_TIME_AVG_DATE_COLUMN = "date";
+	private static final String STAY_TIME_AVG_TIME_COLUMN = "avg_time";
 	
 	private static final String HOUR_COLUMNS = "hour_01,hour_02,hour_03,hour_04,hour_05,hour_06,hour_07,hour_08,hour_09,hour_10,hour_11,hour_12" +
 			",hour_13,hour_14,hour_15,hour_16,hour_17,hour_18,hour_19,hour_20,hour_21,hour_22,hour_23,hour_24";
@@ -245,7 +246,88 @@ public class DataProvider {
 			}
 		}
 	}
+	/*
+	 * Author:hongsong
+	 * Time:2013-07-07 
+	 * Function:calculate the avg time of every devices & every day,and update the stay_time_avg table;
+	 * Input paras:null 
+	 * Output paras:null
+	 * 
+	 */
+	public void updateStayTimeAvgTable() {
+		log("updateStayTimeAvgTable======");
+		MySQL db = new MySQL();
+		
+		//For cal the avg time ,form the tmp table 
+		String tmpSelectSQL = null ;
+		String tmpFormat = "select avg(timestampdiff(second,min,max)) as avgtime from (select max(" + MOFIADATA_STAMPTIME_COLUMN + ") as max , min(" + MOFIADATA_STAMPTIME_COLUMN + ") as min from " + DATABASE_TABLE_MOFIADATA
+				+ " where " + MOFIADATA_DEVICESID_COLUMN + " ='%s' and date(" + MOFIADATA_STAMPTIME_COLUMN + ")='%s' group by " + MOFIADATA_MAC_COLUMN + " ) as t" ;
+		ResultSet rs = null ;
+		
+		float avgtime = 0 ;
+		
+		if(db.connSQL()){
+			for(int i = 0; i < mDevices.size(); i++) {
+				//get the total devices
+				log("Devices " + i + " is " + mDevices.get(i));
+				String devicesID = mDevices.get(i);
+				
+				//get the available date depend on the individual device
+				ArrayList<String> dataArrayList = mdateWithDevices.get(devicesID);
+				
+				//cal the avg time of every date
+				for(int j = 0; j < dataArrayList.size(); j++) {
+					/* tmpSelectSQL should be like this: 
+					 * select mac,avg(timestampdiff(second,min,max)) as avgtime 
+					 * from (select mac ,max(stamptime) as max,min(stamptime) as min from mofidata 
+					 * where loc = '0001000011' and date(stamptime)='2013-07-06' group by mac limit 20)
+					*/
+					dLog("devicesID= " + devicesID + "dataArrayList[" + j + "]= " + dataArrayList.get(j));
+					tmpSelectSQL = String.format( tmpFormat, devicesID , dataArrayList.get(j) );
+					
+					dLog(tmpSelectSQL);
+					rs = db.selectSQL(tmpSelectSQL);
+					try {
+						while(rs.next()) {
+							log("cal the avgtime from mofidata: " + devicesID +'\t'+ dataArrayList.get(j) +'\t' + rs.getFloat("avgtime"));
+							avgtime = rs.getFloat(1);
+						}
+					} catch (Exception e) {
+						log("Exception in getavgtime from datamofi");
+					}
+					
+					String insertAvgSQL = "insert into " + DATABASE_TABLE_STAY_TIME_AVG + " ("+ STAY_TIME_AVG_DEVICESID_COLUMN + "," + STAY_TIME_AVG_DATE_COLUMN + "," +
+							STAY_TIME_AVG_TIME_COLUMN + ") values ('" + devicesID + "','" + dataArrayList.get(j) + "','" + avgtime + "')" ;
+					String updateAvgSQL = "update " + DATABASE_TABLE_STAY_TIME_AVG + " set " + STAY_TIME_AVG_TIME_COLUMN + "=" + avgtime ;
+					updateAvgSQL = updateAvgSQL + " where " + STAY_TIME_AVG_DEVICESID_COLUMN + "='" + devicesID + "' and " + STAY_TIME_AVG_DATE_COLUMN + "='" + dataArrayList.get(j) +"'";
+									
+					log(insertAvgSQL);
+					log(updateAvgSQL);
+
+					if(isExist(devicesID, dataArrayList.get(j), DATABASE_TABLE_STAY_TIME_AVG)) {
+						if (db.updateSQL(updateAvgSQL) == true) {
+							log("update stay_time_avg successfully");
+						}
+					} else {
+						if (db.insertSQL(insertAvgSQL) == true) {
+							log("insert stay_time_avg successfully");
+						}
+					}
+					
+				}//end of inner loop
+			}//end of outter loop
+			
+			db.deconnSQL();
+			
+		}else{
+			log("can't connect the mysql database!");
+		}
+	}
 	
+	public void adjustDataNeedUpdate() {
+		
+	}
+
 	public void dump() {
 		dLog("========dump mDevices start=======");
 		for(int i = 0; i < mDevices.size(); i++) {
