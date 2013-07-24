@@ -18,6 +18,8 @@ import com.zhimatech.mofi.util.Util;
 public class DataTrim {
 	private static final String TAG = "zhimaDataTrim";
 	
+	private static final int NEED_UPDATE_TIME = 2*60*100;
+	
 	private Timer timer = new Timer();
 	private DataProvider mDp = new DataProvider();
 	
@@ -26,7 +28,9 @@ public class DataTrim {
 		public void run() {
 			// TODO Auto-generated method stub
 			Util.Log(TAG, "Timetask start");
-			mDp.init();
+			mDp.clear();
+			mDp.init(NEED_UPDATE_TIME);
+			mDp.updateStayTimeAvgTable();
 			mDp.updateRawCustomerFlowTable();
 			mDp.dump();
 			Util.Log(TAG, "Timetask end");
@@ -34,12 +38,13 @@ public class DataTrim {
 	}
 
 	public DataTrim() throws IOException {
-		timer.schedule(new MyTask(), 1000, 1800000);
-//		Util.Log(TAG, "Timetask start");
-		mDp.init();
-//		mDp.updateRawCustomerFlowTable();
+		Util.Log(TAG, "DataTrim start");
+		mDp.init(-1);
+		mDp.updateStayTimeAvgTable();
+		mDp.updateRawCustomerFlowTable();
+		timer.schedule(new MyTask(), 1000, 600000);
 		//mDp.dump();
-//		Util.Log(TAG, "Timetask end");
+		Util.Log(TAG, "DataTrim end");
 	}
 	
 	public static void main(String[] args) throws IOException {

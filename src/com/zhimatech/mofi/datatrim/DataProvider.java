@@ -8,6 +8,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 
 public class DataProvider {
 	private static final String DATABASE_TABLE_MOFIADATA= "mofidata";
@@ -35,18 +36,23 @@ public class DataProvider {
 	private SimpleDateFormat DATAFORMAT = new SimpleDateFormat("yyyyMMdd");
 
 	private static final String TAG = "DataProvider";
-	private static final boolean DBG = false;
+	private static final boolean DBG = true;
 	private static final boolean VDBG = true;
 
 	private ArrayList<String> mDevices = new ArrayList<String>();
 	private ArrayList<String> mDate = new ArrayList<String>();
-	private HashMap<String, ArrayList<String>> mdateWithDevices = new HashMap<String, ArrayList<String>>(); //Used to update all from mofidata
-	private HashMap<String, ArrayList<String>> mNeedUpdateDateWithDevices = new HashMap<String, ArrayList<String>>(); //used to update the changed info from mofidata
+	private Map<String, ArrayList<String>> mdateWithDevices = new HashMap<String, ArrayList<String>>(); //Used to update all from mofidata
+	private Map<String, ArrayList<String>> mNeedUpdateDateWithDevices = new HashMap<String, ArrayList<String>>(); //used to update the changed info from mofidata
 
-	public void queryDevices() {
+	public void queryDevices(int needUpdateTime) {
 		MySQL db = new MySQL();
 		if(db.connSQL()) {
-			String sql = "select distinct loc from "+ DATABASE_TABLE_MOFIADATA;;
+			String sql;
+			if (needUpdateTime != -1) {
+				sql = "select distinct loc from "+ DATABASE_TABLE_MOFIADATA + " where " + MOFIADATA_STAMPTIME_COLUMN + " between now()-" + needUpdateTime + " and now()";
+			} else {
+				sql = "select distinct loc from "+ DATABASE_TABLE_MOFIADATA;
+			}
 			ResultSet rs = db.selectSQL(sql);
 			try {
 				while(rs.next()) {
@@ -62,6 +68,7 @@ public class DataProvider {
 			db.deconnSQL();
 		}
 	}
+	
 	public boolean isExist(String devicesID, String date, String dataBaseTable) {
 		boolean isExist = false;
 		MySQL db = new MySQL();
@@ -79,10 +86,15 @@ public class DataProvider {
 		}
 		return isExist;
 	}
-	public void queryDate() {
+	public void queryDate(int needUpdateTime) {
 		MySQL db = new MySQL();
 		if(db.connSQL()) {
-			String sql = "select distinct stamptime from "+ DATABASE_TABLE_MOFIADATA;
+			String sql;
+			if (needUpdateTime != -1) {
+				sql = "select distinct stamptime from "+ DATABASE_TABLE_MOFIADATA + " where " + MOFIADATA_STAMPTIME_COLUMN + " between now()-" + needUpdateTime + " and now()";
+			} else {
+				sql = "select distinct stamptime from "+ DATABASE_TABLE_MOFIADATA;
+			}
 			ResultSet rs = db.selectSQL(sql);
 			try {
 				while(rs.next()) {
@@ -101,13 +113,18 @@ public class DataProvider {
 			db.deconnSQL();
 		}
 	}
-	public void queryDateWithDevices() {
+	public void queryDateWithDevices(int needUpdateTime) {
 		MySQL db = new MySQL();
 		for(int i = 0; i < mDevices.size(); i++) {
 			if(db.connSQL()) {
 				String devicesID = mDevices.get(i);
+				String sql;
 				ArrayList<String> dateArrayList = mdateWithDevices.get(devicesID);
-				String sql = "select distinct stamptime from "+ DATABASE_TABLE_MOFIADATA + " where loc='" + devicesID + "'";
+				if (needUpdateTime != -1) {
+					sql = "select distinct stamptime from "+ DATABASE_TABLE_MOFIADATA + " where loc='" + devicesID + "' and " + MOFIADATA_STAMPTIME_COLUMN + " between now()-" + needUpdateTime + " and now()";
+				} else {
+					sql = "select distinct stamptime from "+ DATABASE_TABLE_MOFIADATA + " where loc='" + devicesID + "'";
+				}
 				log("queryDateWithDevices sql= " + sql);
 				ResultSet rs = db.selectSQL(sql);
 				try {
@@ -183,10 +200,15 @@ public class DataProvider {
 	}
 	public void updateRawCustomerFlowTable() {
 		log("updateRawFlowTable======");
-		for(int i = 0; i < mDevices.size(); i++) {
-			log("Devices " + i + " is " + mDevices.get(i));
-			String devicesID = mDevices.get(i);
-			ArrayList<String> dataArrayList = mdateWithDevices.get(devicesID);
+		if (mdateWithDevices == null) {
+			log("mdateWithDevices is null");
+			return;
+		}
+		Iterator it =  mdateWithDevices.entrySet().iterator();
+		while(it.hasNext()){
+			Entry obj = (Entry)it.next();
+			String devicesID = (String) obj.getKey();
+			ArrayList<String> dataArrayList = (ArrayList<String>) obj.getValue();
 			//FIXME: This is hard code for test.
 			for(int j = 0; j < dataArrayList.size(); j++) {
 				String insertRawSQL = "insert into " + DATABASE_TABLE_RAW_FLOW + " (devicesID,date," +
@@ -195,6 +217,7 @@ public class DataProvider {
 						HOUR_COLUMNS + ") values ('" + devicesID + "','" + dataArrayList.get(j) + "'";
 				String updateRawFlowSQL = "update " + DATABASE_TABLE_RAW_FLOW + " set ";
 				String updateCustomerFlowSQL = "update " + DATABASE_TABLE_CUSTOMER_FLOW + " set ";
+
 				int[] numOfHour = getNumberHour(devicesID, dataArrayList.get(j));
 				int[] numOfHourDistinct = getNumberHourDistinct(devicesID, dataArrayList.get(j));
 
@@ -256,24 +279,30 @@ public class DataProvider {
 	 */
 	public void updateStayTimeAvgTable() {
 		log("updateStayTimeAvgTable======");
+		if (mdateWithDevices == null) {
+			log("mdateWithDevices is null");
+			return;
+		}
 		MySQL db = new MySQL();
-		
+
 		//For cal the avg time ,form the tmp table 
 		String tmpSelectSQL = null ;
 		String tmpFormat = "select avg(timestampdiff(second,min,max)) as avgtime from (select max(" + MOFIADATA_STAMPTIME_COLUMN + ") as max , min(" + MOFIADATA_STAMPTIME_COLUMN + ") as min from " + DATABASE_TABLE_MOFIADATA
 				+ " where " + MOFIADATA_DEVICESID_COLUMN + " ='%s' and date(" + MOFIADATA_STAMPTIME_COLUMN + ")='%s' group by " + MOFIADATA_MAC_COLUMN + " ) as t" ;
 		ResultSet rs = null ;
-		
+
 		float avgtime = 0 ;
-		
-		if(db.connSQL()){
-			for(int i = 0; i < mDevices.size(); i++) {
+
+
+			
+			Iterator it =  mdateWithDevices.entrySet().iterator();
+			while(it.hasNext()){
+				Entry obj = (Entry)it.next();
 				//get the total devices
-				log("Devices " + i + " is " + mDevices.get(i));
-				String devicesID = mDevices.get(i);
+				String devicesID = (String) obj.getKey();
 				
 				//get the available date depend on the individual device
-				ArrayList<String> dataArrayList = mdateWithDevices.get(devicesID);
+				ArrayList<String> dataArrayList = (ArrayList<String>) obj.getValue();
 				
 				//cal the avg time of every date
 				for(int j = 0; j < dataArrayList.size(); j++) {
@@ -286,14 +315,17 @@ public class DataProvider {
 					tmpSelectSQL = String.format( tmpFormat, devicesID , dataArrayList.get(j) );
 					
 					dLog(tmpSelectSQL);
-					rs = db.selectSQL(tmpSelectSQL);
-					try {
-						while(rs.next()) {
-							log("cal the avgtime from mofidata: " + devicesID +'\t'+ dataArrayList.get(j) +'\t' + rs.getFloat("avgtime"));
-							avgtime = rs.getFloat(1);
+					if(db.connSQL()){ 
+						rs = db.selectSQL(tmpSelectSQL);
+						try {
+							while(rs.next()) {
+								log("cal the avgtime from mofidata: " + devicesID +'\t'+ dataArrayList.get(j) +'\t' + rs.getFloat("avgtime"));
+								avgtime = rs.getFloat(1);
+							}
+						} catch (Exception e) {
+							log("Exception in getavgtime from datamofi");
 						}
-					} catch (Exception e) {
-						log("Exception in getavgtime from datamofi");
+						db.deconnSQL();
 					}
 					
 					String insertAvgSQL = "insert into " + DATABASE_TABLE_STAY_TIME_AVG + " ("+ STAY_TIME_AVG_DEVICESID_COLUMN + "," + STAY_TIME_AVG_DATE_COLUMN + "," +
@@ -303,25 +335,21 @@ public class DataProvider {
 									
 					log(insertAvgSQL);
 					log(updateAvgSQL);
-
-					if(isExist(devicesID, dataArrayList.get(j), DATABASE_TABLE_STAY_TIME_AVG)) {
-						if (db.updateSQL(updateAvgSQL) == true) {
-							log("update stay_time_avg successfully");
+					if(db.connSQL()){
+						if(isExist(devicesID, dataArrayList.get(j), DATABASE_TABLE_STAY_TIME_AVG)) {
+							if (db.updateSQL(updateAvgSQL) == true) {
+								log("update stay_time_avg successfully");
+							}
+						} else {
+							if (db.insertSQL(insertAvgSQL) == true) {
+								log("insert stay_time_avg successfully");
+							}
 						}
-					} else {
-						if (db.insertSQL(insertAvgSQL) == true) {
-							log("insert stay_time_avg successfully");
-						}
+						db.deconnSQL();
 					}
 					
 				}//end of inner loop
 			}//end of outter loop
-			
-			db.deconnSQL();
-			
-		}else{
-			log("can't connect the mysql database!");
-		}
 	}
 	
 	public void adjustDataNeedUpdate() {
@@ -358,10 +386,16 @@ public class DataProvider {
 		dLog("========dump mdateWithDevices end=======");
 	}
 	
-	public void init() {
-		queryDevices();
-		queryDate();
-		queryDateWithDevices();
+	public void init(int needUpdateTime) {
+		queryDevices(needUpdateTime);
+		queryDate(needUpdateTime);
+		queryDateWithDevices(needUpdateTime);
+	}
+	
+	public void clear() {
+		mDevices.clear();
+		mDate.clear();
+		mdateWithDevices.clear();
 	}
 
 	private void log(String data) {
