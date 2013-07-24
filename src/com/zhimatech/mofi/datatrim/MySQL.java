@@ -10,7 +10,7 @@ import java.sql.SQLException;
 public class MySQL {
 	private static final String DATABASE_URL = "jdbc:mysql://localhost/zhimallapp";
 	private static final String USERNAME = "root";
-	private static final String PASSWORD = "jszhuzhi7812";
+	private static final String PASSWORD = "zhimatech";
 //	private static final String PASSWORD = "Fw861114";
 	private static final String TAG = "MySQL";
 	
